@@ -69,20 +69,23 @@ from sqlalchemy.testing.suite.test_dialect import EscapingTest as _EscapingTest
 from sqlalchemy.testing.suite.test_insert import (
     InsertBehaviorTest as _InsertBehaviorTest,
 )
-from sqlalchemy.testing.suite.test_reflection import (
-    ComponentReflectionTest as _ComponentReflectionTest,
+from sqlalchemy.testing.suite.test_select import (  # noqa: F401, F403
+    CollateTest,
+    ComputedColumnTest,
+    CompoundSelectTest as _CompoundSelectTest,
+    ExistsTest as _ExistsTest,
+    ExpandingBoundInTest,
+    IsOrIsNotDistinctFromTest as _IsOrIsNotDistinctFromTest,
+    LikeFunctionsTest as _LikeFunctionsTest,
+    LimitOffsetTest,
+    OrderByLabelTest as _OrderByLabelTest,
 )
 from sqlalchemy.testing.suite.test_reflection import (
     QuotedNameArgumentTest as _QuotedNameArgumentTest,
-)
-from sqlalchemy.testing.suite.test_reflection import (
+    ComponentReflectionTest as _ComponentReflectionTest,
     CompositeKeyReflectionTest as _CompositeKeyReflectionTest,
 )
 from sqlalchemy.testing.suite.test_results import RowFetchTest as _RowFetchTest
-from sqlalchemy.testing.suite.test_select import ExistsTest as _ExistsTest
-from sqlalchemy.testing.suite.test_select import (
-    IsOrIsNotDistinctFromTest as _IsOrIsNotDistinctFromTest,
-)
 from sqlalchemy.testing.suite.test_types import BooleanTest as _BooleanTest
 from sqlalchemy.testing.suite.test_types import IntegerTest as _IntegerTest
 from sqlalchemy.testing.suite.test_types import _LiteralRoundTripFixture
@@ -818,11 +821,6 @@ class InsertBehaviorTest(_InsertBehaviorTest):
         pass
 
 
-@pytest.mark.skip("Spanner doesn't support IS DISTINCT FROM clause")
-class IsOrIsNotDistinctFromTest(_IsOrIsNotDistinctFromTest):
-    pass
-
-
 class BytesTest(_LiteralRoundTripFixture, fixtures.TestBase):
     __backend__ = True
 
@@ -837,3 +835,91 @@ class BytesTest(_LiteralRoundTripFixture, fixtures.TestBase):
 @pytest.mark.skip("Spanner doesn't support quotes in table names.")
 class QuotedNameArgumentTest(_QuotedNameArgumentTest):
     pass
+
+
+@pytest.mark.skip("Spanner doesn't support IS DISTINCT FROM clause")
+class IsOrIsNotDistinctFromTest(_IsOrIsNotDistinctFromTest):
+    pass
+
+
+class OrderByLabelTest(_OrderByLabelTest):
+    @pytest.mark.skip(
+        "Spanner throws a syntax error as group by composed doesn't support."
+    )
+    def test_group_by_composed(self):
+        pass
+
+
+class CompoundSelectTest(_CompoundSelectTest):
+    @pytest.mark.skip("Spanner throws a syntax error.")
+    def test_limit_offset_selectable_in_unions(self):
+        pass
+
+    @pytest.mark.skip("Spanner throws a syntax error.")
+    def test_order_by_selectable_in_unions(self):
+        pass
+
+
+class LikeFunctionsTest(_LikeFunctionsTest):
+    @pytest.mark.skip(
+        "Spanner throws an Syntax error: Parenthesized expression "
+        "cannot be parsed as an expression"
+    )
+    def test_contains_autoescape(self):
+        pass
+
+    @pytest.mark.skip(
+        "Spanner throws an Syntax error: Parenthesized expression "
+        "cannot be parsed as an expression"
+    )
+    def test_contains_autoescape_escape(self):
+        pass
+
+    @pytest.mark.skip(
+        "Spanner throws an Syntax error: Parenthesized expression "
+        "cannot be parsed as an expression"
+    )
+    def test_contains_escape(self):
+        pass
+
+    @pytest.mark.skip(
+        "Spanner throws an Syntax error: Parenthesized expression "
+        "cannot be parsed as an expression"
+    )
+    def test_endswith_autoescape(self):
+        pass
+
+    @pytest.mark.skip(
+        "Spanner throws an Syntax error: Parenthesized expression "
+        "cannot be parsed as an expression"
+    )
+    def test_endswith_escape(self):
+        pass
+
+    @pytest.mark.skip(
+        "Spanner throws an Syntax error: Parenthesized expression "
+        "cannot be parsed as an expression"
+    )
+    def test_endswith_autoescape_escape(self):
+        pass
+
+    @pytest.mark.skip(
+        "Spanner throws an Syntax error: Parenthesized expression "
+        "cannot be parsed as an expression"
+    )
+    def test_startswith_autoescape(self):
+        pass
+
+    @pytest.mark.skip(
+        "Spanner throws an Syntax error: Parenthesized expression "
+        "cannot be parsed as an expression"
+    )
+    def test_startswith_escape(self):
+        pass
+
+    @pytest.mark.skip(
+        "Spanner throws an Syntax error: Parenthesized expression "
+        "cannot be parsed as an expression"
+    )
+    def test_startswith_autoescape_escape(self):
+        pass
