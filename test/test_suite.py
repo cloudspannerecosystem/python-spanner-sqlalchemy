@@ -80,6 +80,7 @@ from sqlalchemy.testing.suite.test_reflection import (
 )
 from sqlalchemy.testing.suite.test_results import RowFetchTest as _RowFetchTest
 from sqlalchemy.testing.suite.test_select import ExistsTest as _ExistsTest
+from sqlalchemy.testing.suite.test_select import LikeFunctionsTest as _LikeFunctionsTest
 from sqlalchemy.testing.suite.test_select import (
     IsOrIsNotDistinctFromTest as _IsOrIsNotDistinctFromTest,
 )
@@ -843,3 +844,47 @@ class BytesTest(_LiteralRoundTripFixture, fixtures.TestBase):
 @pytest.mark.skip("Spanner doesn't support quotes in table names.")
 class QuotedNameArgumentTest(_QuotedNameArgumentTest):
     pass
+
+
+class LikeFunctionsTest(_LikeFunctionsTest):
+    @pytest.mark.skip("Spanner doesn't support LIKE ESCAPE clause")
+    def test_contains_autoescape(self):
+        pass
+
+    @pytest.mark.skip("Spanner doesn't support LIKE ESCAPE clause")
+    def test_contains_autoescape_escape(self):
+        pass
+
+    @pytest.mark.skip("Spanner doesn't support LIKE ESCAPE clause")
+    def test_contains_escape(self):
+        pass
+
+    @pytest.mark.skip("Spanner doesn't support LIKE ESCAPE clause")
+    def test_endswith_autoescape(self):
+        pass
+
+    @pytest.mark.skip("Spanner doesn't support LIKE ESCAPE clause")
+    def test_endswith_autoescape_escape(self):
+        pass
+
+    @pytest.mark.skip("Spanner doesn't support LIKE ESCAPE clause")
+    def test_endswith_escape(self):
+        pass
+
+    @pytest.mark.skip("Spanner doesn't support LIKE ESCAPE clause")
+    def test_startswith_autoescape(self):
+        pass
+
+    @pytest.mark.skip("Spanner doesn't support LIKE ESCAPE clause")
+    def test_startswith_escape(self):
+        pass
+
+    @pytest.mark.skip("Spanner doesn't support LIKE ESCAPE clause")
+    def test_startswith_autoescape_escape(self):
+        pass
+
+    def test_escape_keyword_raises(self):
+        """Check that ESCAPE keyword causes an exception when used."""
+        with pytest.raises(NotImplementedError):
+            col = self.tables.some_table.c.data
+            self._test(col.contains("b##cde", escape="#"), {7})
