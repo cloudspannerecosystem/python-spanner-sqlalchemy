@@ -57,6 +57,7 @@ from sqlalchemy.testing.suite.test_dialect import *  # noqa: F401, F403
 from sqlalchemy.testing.suite.test_insert import *  # noqa: F401, F403
 from sqlalchemy.testing.suite.test_reflection import *  # noqa: F401, F403
 from sqlalchemy.testing.suite.test_results import *  # noqa: F401, F403
+from sqlalchemy.testing.suite.test_select import *  # noqa: F401, F403
 from sqlalchemy.testing.suite.test_sequence import *  # noqa: F401, F403
 from sqlalchemy.testing.suite.test_update_delete import *  # noqa: F401, F403
 
@@ -80,6 +81,9 @@ from sqlalchemy.testing.suite.test_reflection import (
 )
 from sqlalchemy.testing.suite.test_results import RowFetchTest as _RowFetchTest
 from sqlalchemy.testing.suite.test_select import ExistsTest as _ExistsTest
+from sqlalchemy.testing.suite.test_select import (
+    CompoundSelectTest as _CompoundSelectTest,
+)
 from sqlalchemy.testing.suite.test_select import (
     IsOrIsNotDistinctFromTest as _IsOrIsNotDistinctFromTest,
 )
@@ -827,6 +831,16 @@ class IsOrIsNotDistinctFromTest(_IsOrIsNotDistinctFromTest):
 @pytest.mark.skip("Spanner doesn't support composed GROUP BY")
 class OrderByLabelTest(_OrderByLabelTest):
     pass
+
+
+class CompoundSelectTest(_CompoundSelectTest):
+    @pytest.mark.skip("Spanner doesn't support ORDER BY clause in UNION subqueries")
+    def test_limit_offset_selectable_in_unions(self):
+        pass
+
+    @pytest.mark.skip("Spanner doesn't support ORDER BY clause in UNION subqueries")
+    def test_order_by_selectable_in_unions(self):
+        pass
 
 
 class BytesTest(_LiteralRoundTripFixture, fixtures.TestBase):
