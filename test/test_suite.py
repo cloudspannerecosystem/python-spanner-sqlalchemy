@@ -86,6 +86,8 @@ from sqlalchemy.testing.suite.test_select import (
 from sqlalchemy.testing.suite.test_select import OrderByLabelTest as _OrderByLabelTest
 from sqlalchemy.testing.suite.test_types import BooleanTest as _BooleanTest
 from sqlalchemy.testing.suite.test_types import IntegerTest as _IntegerTest
+from sqlalchemy.testing.suite.test_types import StringTest as _StringTest
+
 from sqlalchemy.testing.suite.test_types import _LiteralRoundTripFixture
 
 from sqlalchemy.testing.suite.test_types import (  # noqa: F401, F403
@@ -535,7 +537,6 @@ class IntegerTest(_IntegerTest):
                     )
                 )
                 conn.execute(ins)
-                conn.execute("SELECT 1")
 
             if self.supports_whereclause:
                 stmt = t.select().where(t.c.x == literal(value))
@@ -843,3 +844,38 @@ class BytesTest(_LiteralRoundTripFixture, fixtures.TestBase):
 @pytest.mark.skip("Spanner doesn't support quotes in table names.")
 class QuotedNameArgumentTest(_QuotedNameArgumentTest):
     pass
+
+
+class StringTest(_StringTest):
+    def test_literal_backslashes(self):
+        """
+        SPANNER OVERRIDE:
+
+        Cloud spanner supports prefixed backslash to escape non-alphanumeric characters
+        in string.
+        Override the method to add  additional escape before using it to generate a SQL
+        statement. See:
+        https://cloud.google.com/spanner/docs/lexical#string_and_bytes_literals
+        """
+        input_data = r"backslash one \\ backslash \\\\ two end"
+        output_data = r"backslash one \ backslash \\ two end"
+
+        self._literal_round_trip(String(40), [input_data], [output_data])
+
+    def test_literal_quoting(self):
+        """
+        SPANNER OVERRIDE:
+
+        The original test string is : \"""some 'text' hey "hi there" that's text\"""
+
+        Spanner throws a syntax error for not representing non-alphanumeric characters
+        in string as a raw string.
+        Override the method to change input data into raw string.
+        """
+        input_data = r"""some 'text' hey \"hi there\" that's text"""
+        output_data = """some 'text' hey "hi there" that's text"""
+        self._literal_round_trip(String(40), [input_data], [output_data])
+
+    @pytest.mark.skip("Spanner doesn't support non-ascii characters")
+    def test_literal_non_ascii(self):
+        pass
