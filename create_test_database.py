@@ -15,22 +15,62 @@
 # limitations under the License.
 
 import os
+import time
 
 from google.cloud.spanner_v1 import Client
+from google.cloud.spanner_v1.instance import Instance
+
+
+use_emulator = os.getenv("SPANNER_EMULATOR_HOST") is not None
 
 project = os.getenv(
     "GOOGLE_CLOUD_PROJECT", os.getenv("PROJECT_ID", "emulator-test-project"),
 )
+client = None
 
-client = Client(project=project)
+if use_emulator:
+    from google.auth.credentials import AnonymousCredentials
+    client = Client(
+        project=project, credentials=AnonymousCredentials()
+    )
+else:
+    client = Client(project=project)
 
-config = f"{client.project_name}/instanceConfigs/regional-us-central1"
-instance = client.instance("sqlalchemy-dialect-test", config)
 
-if not instance.exists():
+def reap_old_instances():
+    # Delete test instances that are older than four hours.
+    cutoff = int(time.time()) - 4 * 60 * 60
+    instances_pbs = client.list_instances("labels.python-spanner-sqlalchemy-systest:true")
+    for instance_pb in instances_pbs:
+        instance = Instance.from_pb(instance_pb, client)
+        if "created" not in instance.labels:
+            continue
+        create_time = int(instance.labels["created"])
+        if create_time > cutoff:
+            continue
+        # Backups are not used in sqlalchemy dialect test, therefore instance can just be deleted.
+        instance.delete()
+
+
+def prep_instance():
+    configs = list(client.list_instance_configs())
+    # Filter out non "us" locations
+    configs = [config for config in configs if "-us-" in config.name]
+
+    instance_config = configs[0].name
+    create_time = str(int(time.time()))
+    unique_resource_id = '%s%d' % ('-', 1000 * time.time())
+    instance_id = "sqlalchemy-test" + unique_resource_id
+    labels = {"python-spanner-sqlalchemy-systest": "true", "created": create_time}
+
+    instance = client.instance(instance_id, instance_config, labels=labels)
+
     created_op = instance.create()
     created_op.result(120)  # block until completion
 
     database = instance.database("compliance-test")
     created_op = database.create()
     created_op.result(120)
+
+reap_old_instances()
+prep_instance()
