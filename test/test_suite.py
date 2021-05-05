@@ -45,6 +45,7 @@ from sqlalchemy import Boolean
 from sqlalchemy import String
 from sqlalchemy.types import Integer
 from sqlalchemy.types import Numeric
+from sqlalchemy.types import Text
 from sqlalchemy.testing import requires
 
 from google.api_core.datetime_helpers import DatetimeWithNanoseconds
@@ -87,7 +88,7 @@ from sqlalchemy.testing.suite.test_select import OrderByLabelTest as _OrderByLab
 from sqlalchemy.testing.suite.test_types import BooleanTest as _BooleanTest
 from sqlalchemy.testing.suite.test_types import IntegerTest as _IntegerTest
 from sqlalchemy.testing.suite.test_types import _LiteralRoundTripFixture
-
+from sqlalchemy.testing.suite.test_types import TextTest as _TextTest
 from sqlalchemy.testing.suite.test_types import (  # noqa: F401, F403
     DateTest as _DateTest,
     DateTimeHistoricTest,
@@ -843,3 +844,22 @@ class BytesTest(_LiteralRoundTripFixture, fixtures.TestBase):
 @pytest.mark.skip("Spanner doesn't support quotes in table names.")
 class QuotedNameArgumentTest(_QuotedNameArgumentTest):
     pass
+
+
+class TextTest(_TextTest):
+    @classmethod
+    def define_tables(cls, metadata):
+        """
+        SPANNER OVERRIDE:
+
+        Cloud Spanner doesn't support auto incrementing ids feature,
+        which is used by the original test. Overriding the test data
+        creation method to disable autoincrement and make id column
+        nullable.
+        """
+        Table(
+            "text_table",
+            metadata,
+            Column("id", Integer, primary_key=True, nullable=True),
+            Column("text_data", Text),
+        )
