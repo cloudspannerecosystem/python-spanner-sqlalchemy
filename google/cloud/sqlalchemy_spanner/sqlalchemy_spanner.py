@@ -27,6 +27,7 @@ from sqlalchemy.sql.compiler import (
     RESERVED_WORDS,
 )
 from google.cloud import spanner_dbapi
+from google.cloud.sqlalchemy_spanner._opentelemetry_tracing import trace_call
 
 # Spanner-to-SQLAlchemy types map
 _type_map = {
@@ -685,3 +686,42 @@ LIMIT 1
             conn = conn_proxy.connection
 
         return "AUTOCOMMIT" if conn.autocommit else "SERIALIZABLE"
+
+    def do_rollback(self, dbapi_connection):
+        """To prevent transaction rollback error, rollback is ignored if
+        DBAPI rollback is already executed."""
+        if (
+            not isinstance(dbapi_connection, spanner_dbapi.Connection)
+            and dbapi_connection.connection._transaction
+            and dbapi_connection.connection._transaction.rolled_back
+        ):
+            pass
+        else:
+            trace_attributes = {"db.connection": dbapi_connection}
+            with trace_call("SpannerSqlAlchemy.Rollback", trace_attributes):
+                dbapi_connection.rollback()
+
+    def do_commit(self, dbapi_connection):
+        trace_attributes = {"db.connection": dbapi_connection}
+        with trace_call("SpannerSqlAlchemy.Commit", trace_attributes):
+            dbapi_connection.commit()
+
+    def do_close(self, dbapi_connection):
+        trace_attributes = {"db.connection": dbapi_connection}
+        with trace_call("SpannerSqlAlchemy.Close", trace_attributes):
+            dbapi_connection.close()
+
+    def do_executemany(self, cursor, statement, parameters, context=None):
+        trace_attributes = {"db.statement": statement, "db.params": parameters}
+        with trace_call("SpannerSqlAlchemy.Executemany", trace_attributes):
+            cursor.executemany(statement, parameters)
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+        trace_attributes = {"db.statement": statement, "db.params": parameters}
+        with trace_call("SpannerSqlAlchemy.Execute", trace_attributes):
+            cursor.execute(statement, parameters)
+
+    def do_execute_no_params(self, cursor, statement, context=None):
+        trace_attributes = {"db.statement": statement}
+        with trace_call("SpannerSqlAlchemy.ExecuteNoParams", trace_attributes):
+            cursor.execute(statement)
