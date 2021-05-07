@@ -16,6 +16,7 @@
 
 import operator
 import pytest
+import decimal
 import pytz
 
 import sqlalchemy
@@ -27,8 +28,8 @@ from sqlalchemy.schema import DDL
 from sqlalchemy.testing import config
 from sqlalchemy.testing import db
 from sqlalchemy.testing import eq_
+from sqlalchemy.testing import provide_metadata, emits_warning
 from sqlalchemy.testing import fixtures
-from sqlalchemy.testing import provide_metadata
 from sqlalchemy.testing.provision import temp_table_keyword_args
 from sqlalchemy.testing.schema import Column
 from sqlalchemy.testing.schema import Table
@@ -40,8 +41,9 @@ from sqlalchemy import select
 from sqlalchemy import util
 from sqlalchemy import event
 from sqlalchemy import exists
-from sqlalchemy import LargeBinary
 from sqlalchemy import Boolean
+from sqlalchemy import Float
+from sqlalchemy import LargeBinary
 from sqlalchemy import String
 from sqlalchemy.types import Integer
 from sqlalchemy.types import Numeric
@@ -86,6 +88,7 @@ from sqlalchemy.testing.suite.test_select import (
 from sqlalchemy.testing.suite.test_select import OrderByLabelTest as _OrderByLabelTest
 from sqlalchemy.testing.suite.test_types import BooleanTest as _BooleanTest
 from sqlalchemy.testing.suite.test_types import IntegerTest as _IntegerTest
+from sqlalchemy.testing.suite.test_types import NumericTest as _NumericTest
 from sqlalchemy.testing.suite.test_types import _LiteralRoundTripFixture
 
 from sqlalchemy.testing.suite.test_types import (  # noqa: F401, F403
@@ -509,19 +512,18 @@ class IntegerTest(_IntegerTest):
         """
         SPANNER OVERRIDE:
 
-        Spanner DBAPI does not execute DDL statements unless followed by a
-        non DDL statement, which is preventing correct table clean up.
-        The table already exists after related tests finish, so it doesn't
-        create a new table and when running tests for other data types
-        insertions will fail with `400 Duplicate name in schema: t`.
-        Overriding the tests to create and drop a new table to prevent
-        database existence errors.
-        """
+        Spanner is not able cleanup data and drop the table correctly,
+        table was already exists after related tests finished, so it doesn't
+        create a new table and when started tests for other data type  following
+        insertions will fail with `400 Duplicate name in schema: t.
+        Overriding the tests to create a new table for test and drop table manually
+        before it creates a new table to avoid the same failures."""
 
         # for literal, we test the literal render in an INSERT
         # into a typed column.  we can then SELECT it back as its
         # official type; ideally we'd be able to use CAST here
         # but MySQL in particular can't CAST fully
+
         t = Table("int_t", self.metadata, Column("x", type_))
         t.create()
 
@@ -535,7 +537,6 @@ class IntegerTest(_IntegerTest):
                     )
                 )
                 conn.execute(ins)
-                conn.execute("SELECT 1")
 
             if self.supports_whereclause:
                 stmt = t.select().where(t.c.x == literal(value))
@@ -843,3 +844,368 @@ class BytesTest(_LiteralRoundTripFixture, fixtures.TestBase):
 @pytest.mark.skip("Spanner doesn't support quotes in table names.")
 class QuotedNameArgumentTest(_QuotedNameArgumentTest):
     pass
+
+
+class NumericTest(_NumericTest):
+    @emits_warning(r".*does \*not\* support Decimal objects natively")
+    def test_render_literal_numeric(self):
+        """
+        SPANNER OVERRIDE:
+
+        Cloud Spanner supports tables with an empty primary key, but
+        only a single row can be inserted into such a table -
+        following insertions will fail with `Row [] already exists".
+        Overriding the test to avoid the same failure.
+        """
+        self._literal_round_trip(
+            Numeric(precision=8, scale=4), [15.7563], [decimal.Decimal("15.7563")],
+        )
+        self._literal_round_trip(
+            Numeric(precision=8, scale=4),
+            [decimal.Decimal("15.7563")],
+            [decimal.Decimal("15.7563")],
+        )
+
+    @emits_warning(r".*does \*not\* support Decimal objects natively")
+    def test_render_literal_numeric_asfloat(self):
+        """
+        SPANNER OVERRIDE:
+
+        Cloud Spanner supports tables with an empty primary key, but
+        only a single row can be inserted into such a table -
+        following insertions will fail with `Row [] already exists".
+        Overriding the test to avoid the same failure.
+        """
+        self._literal_round_trip(
+            Numeric(precision=8, scale=4, asdecimal=False), [15.7563], [15.7563],
+        )
+        self._literal_round_trip(
+            Numeric(precision=8, scale=4, asdecimal=False),
+            [decimal.Decimal("15.7563")],
+            [15.7563],
+        )
+
+    def test_render_literal_float(self):
+        """
+        SPANNER OVERRIDE:
+
+        Cloud Spanner supports tables with an empty primary key, but
+        only a single row can be inserted into such a table -
+        following insertions will fail with `Row [] already exists".
+        Overriding the test to avoid the same failure.
+        """
+        self._literal_round_trip(
+            Float(4),
+            [decimal.Decimal("15.7563")],
+            [15.7563],
+            filter_=lambda n: n is not None and round(n, 5) or None,
+        )
+
+        self._literal_round_trip(
+            Float(4),
+            [decimal.Decimal("15.7563")],
+            [15.7563],
+            filter_=lambda n: n is not None and round(n, 5) or None,
+        )
+
+    @requires.precision_generic_float_type
+    def test_float_custom_scale(self):
+        """
+        SPANNER OVERRIDE:
+
+        Cloud Spanner supports tables with an empty primary key, but
+        only a single row can be inserted into such a table -
+        following insertions will fail with `Row [] already exists".
+        Overriding the test to avoid the same failure.
+        """
+        self._do_test(
+            Float(None, decimal_return_scale=7, asdecimal=True),
+            [15.7563827],
+            [decimal.Decimal("15.7563827")],
+            check_scale=True,
+        )
+
+        self._do_test(
+            Float(None, decimal_return_scale=7, asdecimal=True),
+            [15.7563827],
+            [decimal.Decimal("15.7563827")],
+            check_scale=True,
+        )
+
+    def test_numeric_as_decimal(self):
+        """
+        SPANNER OVERRIDE:
+
+        Spanner throws an error 400 Value has type FLOAT64 which cannot be
+        inserted into column x, which has type NUMERIC for value 15.7563.
+        Overriding the test to remove the failure case.
+        """
+        self._do_test(
+            Numeric(precision=8, scale=4),
+            [decimal.Decimal("15.7563")],
+            [decimal.Decimal("15.7563")],
+        )
+
+    def test_numeric_as_float(self):
+        """
+        SPANNER OVERRIDE:
+
+        Spanner throws an error 400 Value has type FLOAT64 which cannot be
+        inserted into column x, which has type NUMERIC for value 15.7563.
+        Overriding the test to remove the failure case.
+        """
+
+        self._do_test(
+            Numeric(precision=8, scale=4, asdecimal=False),
+            [decimal.Decimal("15.7563")],
+            [15.7563],
+        )
+
+    @requires.floats_to_four_decimals
+    def test_float_as_decimal(self):
+        """
+        SPANNER OVERRIDE:
+
+        Cloud Spanner supports tables with an empty primary key, but
+        only a single row can be inserted into such a table -
+        following insertions will fail with `Row [] already exists".
+        Overriding the test to avoid the same failure.
+        """
+        self._do_test(
+            Float(precision=8, asdecimal=True), [15.7563], [decimal.Decimal("15.7563")],
+        )
+
+        self._do_test(
+            Float(precision=8, asdecimal=True),
+            [decimal.Decimal("15.7563")],
+            [decimal.Decimal("15.7563")],
+        )
+
+    def test_float_as_float(self):
+        """
+        SPANNER OVERRIDE:
+
+        Cloud Spanner supports tables with an empty primary key, but
+        only a single row can be inserted into such a table -
+        following insertions will fail with `Row [] already exists".
+        Overriding the test to avoid the same failure.
+        """
+        self._do_test(
+            Float(precision=8),
+            [15.7563],
+            [15.7563],
+            filter_=lambda n: n is not None and round(n, 5) or None,
+        )
+
+        self._do_test(
+            Float(precision=8),
+            [decimal.Decimal("15.7563")],
+            [15.7563],
+            filter_=lambda n: n is not None and round(n, 5) or None,
+        )
+
+    @requires.precision_numerics_general
+    def test_precision_decimal(self):
+        """
+        SPANNER OVERRIDE:
+
+        Cloud Spanner supports tables with an empty primary key, but
+        only a single row can be inserted into such a table -
+        following insertions will fail with `Row [] already exists".
+        Overriding the test to avoid the same failure.
+
+        Remove an extra digits after decimal point as cloud spanner is
+        capable of representing an exact numeric value with a precision
+        of 38 and scale of 9.
+        """
+        self._do_test(
+            Numeric(precision=18, scale=12),
+            [decimal.Decimal("54.234246451")],
+            [decimal.Decimal("54.234246451")],
+        )
+
+        self._do_test(
+            Numeric(precision=18, scale=12),
+            [decimal.Decimal("0.004354")],
+            [decimal.Decimal("0.004354")],
+        )
+
+        self._do_test(
+            Numeric(precision=18, scale=12),
+            [decimal.Decimal("900.0")],
+            [decimal.Decimal("900.0")],
+        )
+
+    @testing.requires.precision_numerics_many_significant_digits
+    def test_many_significant_digits(self):
+        """
+        SPANNER OVERRIDE:
+
+        Cloud Spanner supports tables with an empty primary key, but
+        only a single row can be inserted into such a table -
+        following insertions will fail with `Row [] already exists".
+        Overriding the test to avoid the same failure.
+
+        Remove extra digits after decimal point as cloud spanner is
+        capable of representing an exact numeric value with a precision
+        of 38 and scale of 9.
+        """
+        self._do_test(
+            Numeric(precision=38, scale=12),
+            [decimal.Decimal("31943874831932418390.01")],
+            [decimal.Decimal("31943874831932418390.01")],
+        )
+
+        self._do_test(
+            Numeric(precision=38, scale=12),
+            [decimal.Decimal("319438950232418390.273596")],
+            [decimal.Decimal("319438950232418390.273596")],
+        )
+
+        self._do_test(
+            Numeric(precision=38, scale=12),
+            [decimal.Decimal("87673.594069654")],
+            [decimal.Decimal("87673.594069654")],
+        )
+
+    @testing.requires.precision_numerics_retains_significant_digits
+    def test_numeric_no_decimal(self):
+        """
+        SPANNER OVERRIDE:
+
+        Cloud Spanner ignores the `0`s after the decimal point if all
+        the digits are `0`.
+        Overriding the test to avoid the assertion failure.
+        """
+        self._do_test(
+            Numeric(precision=5, scale=3),
+            [decimal.Decimal("1.000")],
+            [decimal.Decimal("1")],
+            check_scale=True,
+        )
+
+    @testing.requires.precision_numerics_enotation_large
+    def test_enotation_decimal_large(self):
+        """test exceedingly large decimals.
+
+        SPANNER OVERRIDE:
+
+        Cloud Spanner supports tables with an empty primary key, but
+        only a single row can be inserted into such a table -
+        following insertions will fail with `Row [] already exists".
+        Overriding the test to avoid the same failure.
+        """
+
+        self._do_test(
+            Numeric(precision=25, scale=2),
+            [decimal.Decimal("4E+8")],
+            [decimal.Decimal("4E+8")],
+        )
+
+        self._do_test(
+            Numeric(precision=25, scale=2),
+            [decimal.Decimal("5748E+15")],
+            [decimal.Decimal("5748E+15")],
+        )
+
+        self._do_test(
+            Numeric(precision=25, scale=2),
+            [decimal.Decimal("1.521E+15")],
+            [decimal.Decimal("1.521E+15")],
+        )
+
+        self._do_test(
+            Numeric(precision=25, scale=2),
+            [decimal.Decimal("00000000000000.1E+12")],
+            [decimal.Decimal("00000000000000.1E+12")],
+        )
+
+    @testing.requires.precision_numerics_enotation_large
+    def test_enotation_decimal(self):
+        """test exceedingly small decimals.
+
+        Decimal reports values with E notation when the exponent
+        is greater than 6.
+
+        SPANNER OVERRIDE:
+
+        Cloud Spanner supports tables with an empty primary key, but
+        only a single row can be inserted into such a table -
+        following insertions will fail with `Row [] already exists".
+        Overriding the test to avoid the same failure.
+
+        Remove extra digits after decimal point as cloud spanner is
+        capable of representing an exact numeric value with a precision
+        of 38 and scale of 9.
+        """
+        self._do_test(
+            Numeric(precision=18, scale=14),
+            [decimal.Decimal("1E-2")],
+            [decimal.Decimal("1E-2")],
+        )
+
+        self._do_test(
+            Numeric(precision=18, scale=14),
+            [decimal.Decimal("1E-3")],
+            [decimal.Decimal("1E-3")],
+        )
+
+        self._do_test(
+            Numeric(precision=18, scale=14),
+            [decimal.Decimal("1E-4")],
+            [decimal.Decimal("1E-4")],
+        )
+
+        self._do_test(
+            Numeric(precision=18, scale=14),
+            [decimal.Decimal("1E-5")],
+            [decimal.Decimal("1E-5")],
+        )
+
+        self._do_test(
+            Numeric(precision=18, scale=14),
+            [decimal.Decimal("1E-6")],
+            [decimal.Decimal("1E-6")],
+        )
+
+        self._do_test(
+            Numeric(precision=18, scale=14),
+            [decimal.Decimal("1E-7")],
+            [decimal.Decimal("1E-7")],
+        )
+
+        self._do_test(
+            Numeric(precision=18, scale=14),
+            [decimal.Decimal("1E-8")],
+            [decimal.Decimal("1E-8")],
+        )
+
+        self._do_test(
+            Numeric(precision=18, scale=14),
+            [decimal.Decimal("0.010000059")],
+            [decimal.Decimal("0.010000059")],
+        )
+
+        self._do_test(
+            Numeric(precision=18, scale=14),
+            [decimal.Decimal("0.000000059")],
+            [decimal.Decimal("0.000000059")],
+        )
+
+        self._do_test(
+            Numeric(precision=18, scale=14),
+            [decimal.Decimal("0.000000696")],
+            [decimal.Decimal("0.000000696")],
+        )
+
+        self._do_test(
+            Numeric(precision=18, scale=14),
+            [decimal.Decimal("0.700000696")],
+            [decimal.Decimal("0.700000696")],
+        )
+
+        self._do_test(
+            Numeric(precision=18, scale=14),
+            [decimal.Decimal("696E-9")],
+            [decimal.Decimal("696E-9")],
+        )

@@ -68,3 +68,25 @@ class Requirements(SuiteRequirements):
             dict: isolation levels description.
         """
         return {"default": "SERIALIZABLE", "supported": ["SERIALIZABLE", "AUTOCOMMIT"]}
+
+    @property
+    def precision_numerics_many_significant_digits(self):
+        """target backend supports values with many digits on both sides,
+        such as 319438950232418390.273596, 87673.594069654243
+
+        """
+        return exclusions.open()
+
+    @property
+    def precision_numerics_retains_significant_digits(self):
+        """A precision numeric type will return empty significant digits,
+        i.e. a value such as 10.000 will come back in Decimal form with
+        the .000 maintained."""
+
+        return exclusions.open()
+
+    @property
+    def precision_numerics_enotation_large(self):
+        """target backend supports Decimal() objects using E notation
+        to represent very large values."""
+        return exclusions.open()
